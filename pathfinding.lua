@@ -7,14 +7,14 @@ local finish = {}
 local start = {}
 local map = {}
 local pathing_map = {}
-local dnt = false
+local definitely_not_true = false
 local off = {}
-    off[1] = {0, -1, 0}
-    off[2] = {0, 0, -1}
-    off[3] = {-1, 0, 0}
-    off[4] = {1, 0, 0}
-    off[5] = {0, 0, 1}
-    off[6] = {0, 1, 0}
+off[1] = { 0, -1, 0 }
+off[2] = { 0, 0, -1 }
+off[3] = { -1, 0, 0 }
+off[4] = { 1, 0, 0 }
+off[5] = { 0, 0, 1 }
+off[6] = { 0, 1, 0 }
 
 -- match robots perceived coordinates with 'true' ingame coordinates
 local function coord_correction()
@@ -24,7 +24,7 @@ local function coord_correction()
     local offset_x = nav_x - io_x
     local offset_y = nav_y - io_y
     local offset_z = nav_z - io_z
-    offset = {offset_x, offset_y, offset_z}
+    offset = { offset_x, offset_y, offset_z }
 end
 
 -- all coordinates +1000 because fuck negatives coordinates
@@ -33,50 +33,44 @@ local function get_coord()
     local x = nav_x - offset[1] + 1000
     local y = nav_y - offset[2] + 1000
     local z = nav_z - offset[3] + 1000
-    return {x, y, z}
-end
-
--- stolen, rounds numbers
-function round(num, numDecimalPlaces)
-  local mult = 10^(numDecimalPlaces or 0)
-  return math.floor(num * mult + 0.5) / mult
+    return { x, y, z }
 end
 
 -- robot moving stuff
 local function turn_it(robotDir, targetDir)
-  if robotDir == 5.0 then
-    if targetDir == 4.0 then
-      robot.turnAround()
-    elseif targetDir == 3.0 then
-      robot.turnRight()
+    if robotDir == 5.0 then
+        if targetDir == 4.0 then
+            robot.turnAround()
+        elseif targetDir == 3.0 then
+            robot.turnRight()
+        else
+            robot.turnLeft()
+        end
+    elseif robotDir == 4.0 then
+        if targetDir == 5.0 then
+            robot.turnAround()
+        elseif targetDir == 3.0 then
+            robot.turnLeft()
+        else
+            robot.turnRight()
+        end
+    elseif robotDir == 3.0 then
+        if targetDir == 5.0 then
+            robot.turnLeft()
+        elseif targetDir == 4.0 then
+            robot.turnRight()
+        else
+            robot.turnAround()
+        end
     else
-      robot.turnLeft()
+        if targetDir == 5.0 then
+            robot.turnRight()
+        elseif targetDir == 4.0 then
+            robot.turnLeft()
+        else
+            robot.turnAround()
+        end
     end
-  elseif robotDir == 4.0 then
-    if targetDir == 5.0 then
-      robot.turnAround()
-    elseif targetDir == 3.0 then
-      robot.turnLeft()
-    else
-      robot.turnRight()
-    end
-  elseif robotDir == 3.0 then
-    if targetDir == 5.0 then
-      robot.turnLeft()
-    elseif targetDir == 4.0 then
-      robot.turnRight()
-    else
-      robot.turnAround()
-    end
-  else
-    if targetDir == 5.0 then
-      robot.turnRight()
-    elseif targetDir == 4.0 then
-      robot.turnLeft()
-    else
-      robot.turnAround()
-    end
-  end
 end
 
 local function move_it(target_in)
@@ -105,14 +99,16 @@ local function move_it(target_in)
 end
 
 local function distance(self_in, target_in)
-  local return_distance = math.abs(target_in[1] - self_in[1]) + math.abs(target_in[2] - self_in[2]) + math.abs(target_in[3] - self_in[3])
-  return return_distance
+    local return_distance = math.abs(target_in[1] - self_in[1]) + math.abs(target_in[2] - self_in[2]) +
+        math.abs(target_in[3] - self_in[3])
+    return return_distance
 end
 
+test_map = {0:{0:{0:"test"}}} 
+
 -- helper function for cmap, writes map with coordinates, hardness and traversability
-local function c_map_writer(scan_in, coords_in)
-    local x_in, y_in, z_in = coords_in[1], coords_in[2], coords_in[3]
-    local r_coords = get_coord()
+local function c_map_writer(scan_in, scan_offset_in, r_coords)
+    local x_in, y_in, z_in = scan_offset_in[1], scan_offset_in[2], scan_offset_in[3]
     local x = r_coords[1] + x_in
     local y = r_coords[2] + y_in
     local z = r_coords[3] + z_in
@@ -133,33 +129,36 @@ end
 
 -- create map of surrounding area and store it to pairs(map)
 local function c_map_main()
+    local r_coords = get_coord()
     local depth_x, depth_z, depth_y = 3, 3, 3
     local start_x, start_z, start_y = -1, -1, -1
-	local tmp_scan = geo.scan(start_y, start_z, start_y, depth_x, depth_z, depth_y)
+    local tmp_scan = geo.scan(start_x, start_z, start_y, depth_x, depth_z, depth_y)
     local scan_out = {}
-        scan_out[1] = tmp_scan[5]
-        scan_out[2] = tmp_scan[11]
-        scan_out[3] = tmp_scan[13]
-        scan_out[4] = tmp_scan[15]
-        scan_out[5] = tmp_scan[17]
-        scan_out[6] = tmp_scan[23]
+    scan_out[1] = tmp_scan[5]
+    scan_out[2] = tmp_scan[11]
+    scan_out[3] = tmp_scan[13]
+    scan_out[4] = tmp_scan[15]
+    scan_out[5] = tmp_scan[17]
+    scan_out[6] = tmp_scan[23]
     for i = 1, 6 do
-        c_map_writer(scan_out[i], off[i])
+        c_map_writer(scan_out[i], off[i], r_coords)
     end
-    c_map_writer(0, {0, 0, 0})
+    c_map_writer(0, { 0, 0, 0 }, r_coords)
 end
 
 -- creates pathing_map (traversable map nodes), adds fcost, open/closed, traversable/not
+-- pathing_map[x][y][z][1 = distance to finish, 2 = traversability, 3 = open/closed]
 local function update_pathing_map()
     local r_coord = get_coord()
     for x, _ in pairs(map) do
+        pathing_map[x] = pathing_map[x] or {}
         for y, _ in pairs(map[x]) do
+            pathing_map[x][y] = pathing_map[x][y] or {}
             for z, _ in pairs(map[x][y]) do
-                pathing_map[x] = pathing_map[x] or {}
-                pathing_map[x][y] = pathing_map[x][y] or {}
                 pathing_map[x][y][z] = pathing_map[x][y][z] or {}
+
                 if not pathing_map[x][y][z][1] then
-                    pathing_map[x][y][z][1] = distance({x, y, z}, finish)
+                    pathing_map[x][y][z][1] = distance({ x, y, z }, finish)
                 end
                 if not pathing_map[x][y][z][2] then
                     if map[x][y][z][2] == 1 then
@@ -174,21 +173,25 @@ local function update_pathing_map()
             end
         end
     end
-    pathing_map[r_coord[1]][r_coord[2]][r_coord[3]][2] = 0
+    pathing_map[r_coord[1]][r_coord[2]][r_coord[3]][3] = 0
 end
 
+-- map_in = [x][y][z][1 = distance, 2 = traversability, 3 = open/closed]
 local function search_next(map_in)
     local distance_min = math.huge
     local candidates = {}
     for x, _ in pairs(map_in) do
         for y, _ in pairs(map_in[x]) do
             for z, _ in pairs(map_in[x][y]) do
-                if distance_min >= map_in[x][y][z][1] and map_in[x][y][z][2] == 1 then
+                if distance_min >= map_in[x][y][z][1]
+                    and map_in[x][y][z][2] == 1
+                    and map_in[x][y][z][3] == 1
+                then
                     distance_min = map_in[x][y][z][1]
                     if not candidates[distance_min] then
                         candidates[distance_min] = {}
                     end
-                    table.insert(candidates[distance_min], {x, y, z})
+                    table.insert(candidates[distance_min], { x, y, z })
                 end
             end
         end
@@ -203,7 +206,7 @@ local function search_path_helper(path_in, target_in, start_in, steps_in)
     local return_path = {}
     table.insert(return_path, target_in)
     steps_in = steps_in - 1
-    while true do:
+    while true do
         for i = 1, #off do
             if steps_in == 0 then
                 return return_path
@@ -212,8 +215,8 @@ local function search_path_helper(path_in, target_in, start_in, steps_in)
             local y = target_in[2] + off[i][2]
             local z = target_in[3] + off[i][3]
             if path_in[x][y][z][3] == steps_in then
-                table.insert(return_path, {x, y, z})
-                target_in = {x, y, z}
+                table.insert(return_path, { x, y, z })
+                target_in = { x, y, z }
                 steps_in = steps_in - 1
             end
         end
@@ -221,8 +224,8 @@ local function search_path_helper(path_in, target_in, start_in, steps_in)
 end
 
 -- Searches pathing_map for path to next node
--- search_path[x][y][z] [1]fcost, [2]open/close, [3]stepcount
-local function search_path(target_in)
+-- search_path[x][y][z] [1]fcost, [2] traversability, [3]open/close, [4]stepcount
+local function search_path(target_in --[[coord-table]])
     local tmp_path = {}
     local r_coord = get_coord()
     -- fist instance of virtual_x/y/z is robot current location
@@ -235,6 +238,7 @@ local function search_path(target_in)
     tmp_path[r_coord[1]][r_coord[2]][r_coord[3]][1] = math.huge
     tmp_path[r_coord[1]][r_coord[2]][r_coord[3]][2] = 0
     tmp_path[r_coord[1]][r_coord[2]][r_coord[3]][3] = 0
+    tmp_path[r_coord[1]][r_coord[2]][r_coord[3]][4] = 0
     while true do
         local virtual_current = tmp_path[virtual_x][virtual_y][virtual_z]
         if virtual_x == target_in[1] and virtual_y == target_in[2] and virtual_z == target_in[3] then
@@ -252,14 +256,14 @@ local function search_path(target_in)
                     tmp_path[x][y] = tmp_path[x][y] or {}
                     tmp_path[x][y][z] = tmp_path[x][y][z] or {}
                     if not tmp_path[x][y][z][1] then
-                        tmp_path[x][y][z][1] = distance({x, y, z}, target_in)
+                        tmp_path[x][y][z][1] = distance({ x, y, z }, target_in)
                     end
                     if not tmp_path[x][y][z][2] then
                         tmp_path[x][y][z][2] = 1
                     end
                     if not tmp_path[x][y][z][3]
                         or tmp_path[x][y][z][3] > virtual_current[3] + 1 then
-                            tmp_path[x][y][z][3] = virtual_current[3] + 1
+                        tmp_path[x][y][z][3] = virtual_current[3] + 1
                     end
                 end
             end
@@ -268,7 +272,7 @@ local function search_path(target_in)
         virtual_x, virtual_y, virtual_z = next_step[1], next_step[2], next_step[3]
     end
     final_step = tmp_path[target_in[1]][target_in[2]][target_in[3]][3]
-    local return_path = search_path_helper(tmp_path, target_in, path_start, final_step)
+    local return_path = search_path_helper(tmp_path, target_in, start, final_step)
     return return_path
 end
 
@@ -279,7 +283,6 @@ local function walk_path(path_in)
         update_pathing_map()
     end
 end
-
 
 local function main()
     coord_correction()
