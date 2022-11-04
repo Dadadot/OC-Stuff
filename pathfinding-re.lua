@@ -3,7 +3,10 @@ local component = require("component")
 local geo = component.geolyzer
 local nav = component.navigation
 
+<<<<<<< HEAD
 -- +++
+=======
+>>>>>>> github/main
 local function dcopy(table_in)
     local copy = {}
     for k, v in pairs(table_in) do
@@ -16,7 +19,10 @@ local function dcopy(table_in)
     return copy
 end
 
+<<<<<<< HEAD
 -- +++
+=======
+>>>>>>> github/main
 local function is_valid_coord(map_in, x, y, z)
     if map_in[x] and map_in[x][y] and map_in[x][y][z] then
         return true
@@ -44,7 +50,10 @@ local function get_coord(correction_coords)
     return { x, y, z }
 end
 
+<<<<<<< HEAD
 -- should work
+=======
+>>>>>>> github/main
 -- robot moving stuff
 local function turn_it(robotDir, targetDir)
     if robotDir == 5.0 then
@@ -82,14 +91,20 @@ local function turn_it(robotDir, targetDir)
     end
 end
 
+<<<<<<< HEAD
 -- should work
+=======
+>>>>>>> github/main
 local function move_it(target_in, r_coord)
     local target_x, target_y, target_z = target_in[1], target_in[2], target_in[3]
     local target_dir
     local r_dir = nav.getFacing()
+<<<<<<< HEAD
     -- if r_coord[1] == target_in[1] and r_coord[2] == target_in[2] and r_coord[3] == target_in[3] then
     --     return
     -- end
+=======
+>>>>>>> github/main
     if r_coord[2] > target_y then
         robot.down()
     elseif r_coord[2] < target_y then
@@ -107,15 +122,22 @@ local function move_it(target_in, r_coord)
     end
 end
 
+<<<<<<< HEAD
 -- +++
 local function distance(self_in, target_in)
     print("distance")
+=======
+local function distance(self_in, target_in)
+>>>>>>> github/main
     local return_distance = math.abs(target_in[1] - self_in[1]) + math.abs(target_in[2] - self_in[2]) +
         math.abs(target_in[3] - self_in[3])
     return return_distance
 end
 
+<<<<<<< HEAD
 -- should work (it's not rocket surgery)
+=======
+>>>>>>> github/main
 local function reset_map(map_in)
     for x, _ in pairs(map_in) do
         for y, _ in pairs(map_in[x]) do
@@ -128,12 +150,18 @@ local function reset_map(map_in)
     return map_in
 end
 
+<<<<<<< HEAD
 -- +++
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- helper function for cmap, writes map with coordinates, hardness and traversability
 -- impure
 local function c_map_writer(scan_in, scan_offset_in, rcoords, map_in, finish)
     print("c_map_writer")
+=======
+-- map[x][y][z] = {open, distance, hardness, traversable}
+-- impure
+local function c_map_writer(scan_in, scan_offset_in, rcoords, map_in, finish)
+>>>>>>> github/main
     local x_off, y_off, z_off = scan_offset_in[1], scan_offset_in[2], scan_offset_in[3]
     local x = rcoords[1] + x_off
     local y = rcoords[2] + y_off
@@ -164,9 +192,13 @@ local function c_map_writer(scan_in, scan_offset_in, rcoords, map_in, finish)
     end
 end
 
+<<<<<<< HEAD
 -- +++
 -- map[x][y][z] = {hardness, traversability, open/closed, distance}
 -- create map of surrounding area and store it to pairs(map)
+=======
+-- map[x][y][z] = {open, distance, hardness, traversable}
+>>>>>>> github/main
 local function c_map(map_in, rcoords, finish, offset_table)
     print("c_map")
     -- depth
@@ -188,7 +220,10 @@ local function c_map(map_in, rcoords, finish, offset_table)
     return map_in
 end
 
+<<<<<<< HEAD
 -- +++
+=======
+>>>>>>> github/main
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount, traversable}
 local function search_next(map_in)
@@ -212,7 +247,10 @@ local function search_next(map_in)
     return return_coords
 end
 
+<<<<<<< HEAD
 -- +++
+=======
+>>>>>>> github/main
 -- produces path
 local function search_path_helper(path_in, target_in, steps_in, offset_table)
     print("search_path_helper")
@@ -239,7 +277,10 @@ local function search_path_helper(path_in, target_in, steps_in, offset_table)
     end
 end
 
+<<<<<<< HEAD
 -- +++
+=======
+>>>>>>> github/main
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount}
 local function search_path(map_in, target_in, rcoords, offset_table)
