@@ -15,8 +15,8 @@ local function dcopy(table_in)
     return copy
 end
 
-local function is_valid_coord(map_in, x, y, z)
-    if map_in[x] and map_in[x][y] and map_in[x][y][z] then
+local function is_valid_coord(map, x, y, z)
+    if map[x] and map[x][y] and map[x][y][z] then
         return true
     end
     return false
@@ -79,8 +79,8 @@ local function turn_it(robotDir, targetDir)
     end
 end
 
-local function move_it(target_in, r_coord)
-    local target_x, target_y, target_z = target_in[1], target_in[2], target_in[3]
+local function move_it(target, r_coord)
+    local target_x, target_y, target_z = target[1], target[2], target[3]
     local target_dir
     local r_dir = nav.getFacing()
     if r_coord[2] > target_y then
@@ -100,37 +100,39 @@ local function move_it(target_in, r_coord)
     end
 end
 
-local function distance(self_in, target_in)
-    local return_distance = math.abs(target_in[1] - self_in[1]) + math.abs(target_in[2] - self_in[2]) +
-        math.abs(target_in[3] - self_in[3])
-    return return_distance
+local function distance(self_in, start, target)
+    local return_distance = math.abs(target[1] - self_in[1]) + math.abs(target[2] - self_in[2]) +
+        math.abs(target[3] - self_in[3])
+    local s_dist = math.abs(start[1] - self_in[1]) + math.abs(start[2] - self_in[2]) +
+        math.abs(start[3] - self_in[3])
+    return return_distance / s_dist
 end
 
-local function reset_map(map_in)
-    for x, _ in pairs(map_in) do
-        for y, _ in pairs(map_in[x]) do
-            for z, _ in pairs(map_in[x][y]) do
-                map_in[x][y][z][1] = nil
-                map_in[x][y][z][2] = nil
+local function reset_map(map)
+    for x, _ in pairs(map) do
+        for y, _ in pairs(map[x]) do
+            for z, _ in pairs(map[x][y]) do
+                map[x][y][z][1] = nil
+                map[x][y][z][2] = nil
             end
         end
     end
-    return map_in
+    return map
 end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- impure
-local function c_map_writer(scan_in, scan_offset_in, rcoords, map_in, finish)
-    local x_off, y_off, z_off = scan_offset_in[1], scan_offset_in[2], scan_offset_in[3]
+local function c_map_writer(map, scan, scan_off, rcoords, start, finish)
+    local x_off, y_off, z_off = scan_off[1], scan_off[2], scan_off[3]
     local x = rcoords[1] + x_off
     local y = rcoords[2] + y_off
     local z = rcoords[3] + z_off
-    map_in[x] = map_in[x] or {}
-    map_in[x][y] = map_in[x][y] or {}
-    map_in[x][y][z] = map_in[x][y][z] or {}
-    local node = map_in[x][y][z]
+    map[x] = map[x] or {}
+    map[x][y] = map[x][y] or {}
+    map[x][y][z] = map[x][y][z] or {}
+    local node = map[x][y][z]
     -- hardness [3]
-    node[3] = scan_in
+    node[3] = scan
     -- traversability [4]
     if node[3] == 0 then
         node[4] = true
@@ -147,13 +149,13 @@ local function c_map_writer(scan_in, scan_offset_in, rcoords, map_in, finish)
     end
     -- distance [2]
     if not node[2] then
-        node[2] = distance({ x, y, z }, finish)
+        node[2] = distance({ x, y, z }, start, finish)
     end
 end
 
 -- create map of surrounding area and store it to pairs(map)
 -- map[x][y][z] = {open, distance, hardness, traversable}
-local function c_map(map_in, rcoords, finish, offset_table)
+local function c_map(map, offset_table, rcoords, start, finish)
     print("c_map")
     -- depth
     local dx, dz, dy = 3, 3, 3
@@ -168,23 +170,23 @@ local function c_map(map_in, rcoords, finish, offset_table)
     scan_out[5] = tmp_scan[17]
     scan_out[6] = tmp_scan[23]
     for i = 1, 6 do
-        c_map_writer(scan_out[i], offset_table[i], rcoords, map_in, finish)
+        c_map_writer(map, scan_out[i], offset_table[i], rcoords, start, finish)
     end
-    c_map_writer(0, { 0, 0, 0 }, rcoords, map_in, finish)
-    return map_in
+    c_map_writer(map, 0, { 0, 0, 0 }, rcoords, start, finish)
+    return map
 end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount, traversable}
-local function search_next(map_in)
+local function search_next(map)
     print("search_next")
     local distance_min = math.huge
     local candidates = {}
-    for x, _ in pairs(map_in) do
-        for y, _ in pairs(map_in[x]) do
-            for z, _ in pairs(map_in[x][y]) do
-                local open = map_in[x][y][z][1]
-                local dist = map_in[x][y][z][2]
+    for x, _ in pairs(map) do
+        for y, _ in pairs(map[x]) do
+            for z, _ in pairs(map[x][y]) do
+                local open = map[x][y][z][1]
+                local dist = map[x][y][z][2]
                 if distance_min >= dist and open then
                     distance_min = dist
                     candidates[distance_min] = candidates[distance_min] or {}
@@ -198,23 +200,23 @@ local function search_next(map_in)
 end
 
 -- produces path
-local function search_path_helper(path_in, target_in, steps_in, offset_table)
+local function search_path_helper(path_in, target, steps_in, offset_table)
     print("search_path_helper")
     local return_path = {}
-    table.insert(return_path, target_in)
+    table.insert(return_path, target)
     steps_in = steps_in - 1
     while true do
         if steps_in == 0 then
             return return_path
         end
         for i = 1, #offset_table do
-            local x = target_in[1] + offset_table[i][1]
-            local y = target_in[2] + offset_table[i][2]
-            local z = target_in[3] + offset_table[i][3]
+            local x = target[1] + offset_table[i][1]
+            local y = target[2] + offset_table[i][2]
+            local z = target[3] + offset_table[i][3]
             if is_valid_coord(path_in, x, y, z) then
                 if path_in[x][y][z][3] == steps_in then
                     table.insert(return_path, 1, { x, y, z })
-                    target_in = { x, y, z }
+                    target = { x, y, z }
                     steps_in = steps_in - 1
                     break
                 end
@@ -225,12 +227,12 @@ end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount}
-local function search_path(map_in, target_in, rcoords, offset_table)
+local function search_path(map, target, rcoords, offset_table)
     print("search_path")
     local path_tmp = {}
     local final_step
     -- target coords
-    local tx, ty, tz = target_in[1], target_in[2], target_in[3]
+    local tx, ty, tz = target[1], target[2], target[3]
     -- robot coords
     local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
     -- virtual coords
@@ -252,8 +254,8 @@ local function search_path(map_in, target_in, rcoords, offset_table)
             local x = vx + v[1]
             local y = vy + v[2]
             local z = vz + v[3]
-            if is_valid_coord(map_in, x, y, z) then
-                local map_trav = map_in[x][y][z][4]
+            if is_valid_coord(map, x, y, z) then
+                local map_trav = map[x][y][z][4]
                 if map_trav then
                     path_tmp[x] = path_tmp[x] or {}
                     path_tmp[x][y] = path_tmp[x][y] or {}
@@ -265,7 +267,7 @@ local function search_path(map_in, target_in, rcoords, offset_table)
                     end
                     -- distance
                     if not node_tmp[2] then
-                        node_tmp[2] = distance({ x, y, z }, target_in)
+                        node_tmp[2] = distance({ x, y, z }, rcoords, target)
                     end
                     -- stepcount
                     if not node_tmp[3]
@@ -279,7 +281,7 @@ local function search_path(map_in, target_in, rcoords, offset_table)
         vx, vy, vz = next_step[1], next_step[2], next_step[3]
     end
     final_step = path_tmp[tx][ty][tz][3]
-    local path_return = search_path_helper(path_tmp, target_in, final_step, offset_table)
+    local path_return = search_path_helper(path_tmp, target, final_step, offset_table)
     return path_return
 end
 
@@ -292,24 +294,29 @@ local function main()
         [5] = { 0, 0, 1 },
         [6] = { 0, 1, 0 }
     }
+    local start = {}
     local finish = {}
     local correction_coords = {}
     local rcoords = {}
     local map = {}
     local path = {}
+    -- rcoord, start
     correction_coords = coord_correction()
     rcoords = get_coord(correction_coords)
+    start = rcoords
+    -- finish
     io.write("Target: \n")
     local fx, fy, fz = io.read("*n", "*n", "*n")
     fx, fy, fz = fx + 1000, fy + 1000, fz + 1000
     finish = { fx, fy, fz }
+
     while true do
         rcoords = get_coord(correction_coords)
         local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
         if rx == fx and ry == fy and rz == fz then
             break
         end
-        map = c_map(dcopy(map), rcoords, finish, offset_table)
+        map = c_map(dcopy(map), offset_table, rcoords, start, finish)
         map[rx][ry][rz][1] = false
         next = search_next(map)
         rcoords = get_coord(correction_coords)
@@ -317,7 +324,7 @@ local function main()
         for k, _ in pairs(path) do
             move_it(path[k], rcoords)
             rcoords = get_coord(correction_coords)
-            map = c_map(dcopy(map), rcoords, finish, offset_table)
+            map = c_map(dcopy(map), offset_table, rcoords, start, finish)
         end
     end
 end
