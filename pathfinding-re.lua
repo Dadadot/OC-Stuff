@@ -2,46 +2,16 @@ local robot = require("robot")
 local component = require("component")
 local geo = component.geolyzer
 local nav = component.navigation
-
-local function dcopy(table_in)
-    local copy = {}
-    for k, v in pairs(table_in) do
-        if type(v) == 'table' then
-            copy[k] = dcopy(v)
-        else
-            copy[k] = v
-        end
-    end
-    return copy
-end
+local us = require("usual_suspects")
+-- local btn = us.btn()
+-- local stb = us.stb()
+-- local dcopy = us.dcopy()
 
 local function is_valid_coord(map, x, y, z)
     if map[x] and map[x][y] and map[x][y][z] then
         return true
     end
     return false
-end
-
-local function any(val, table)
-    for _, v in pairs(table) do
-        if val == v then
-            return true
-        end
-    end
-    return false
-end
-
--- i don't know if this is even necessary
-local function btn(bool)
-    return bool and 1 or 0
-end
-
-local function ntb(num)
-    return num == 1 and true or false
-end
-
-local function stb(str)
-    return any(str, { "true", "1" }) and true or false
 end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
@@ -51,7 +21,7 @@ local function save_map(map)
     for x, _ in pairs(map) do
         for y, _ in pairs(map[x]) do
             for z, m in pairs(map[x][y]) do
-                io.write(x, " ", y, " ", z, " ", m[3], " ", btn(m[4]), " \n")
+                io.write(x, " ", y, " ", z, " ", m[3], " ", us.btn(m[4]), " \n")
             end
         end
     end
@@ -76,7 +46,7 @@ local function read_map()
             start = stop + 1
         end
         local x, y, z = tonumber(arr_tmp[1]), tonumber(arr_tmp[2]), tonumber(arr_tmp[3])
-        local h, t = tonumber(arr_tmp[4]), stb(arr_tmp[5])
+        local h, t = tonumber(arr_tmp[4]), us.stb(arr_tmp[5])
         arr_return[x] = arr_return[x] or {}
         arr_return[x][y] = arr_return[x][y] or {}
         arr_return[x][y][z] = arr_return[x][y][z] or { nil, nil, h, t }
@@ -163,11 +133,11 @@ local function move_it(target, r_coord)
 end
 
 local function distance(self_in, start, target)
-    local sd = (math.abs(start[1] - self_in[1]) + math.abs(start[2] - self_in[2]) +
-        math.abs(start[3] - self_in[3]))
+    -- local sd = (math.abs(start[1] - self_in[1]) + math.abs(start[2] - self_in[2]) +
+    --     math.abs(start[3] - self_in[3]))
     local td = math.abs(target[1] - self_in[1]) + math.abs(target[2] - self_in[2]) +
         math.abs(target[3] - self_in[3])
-    return td + sd
+    return td
 end
 
 local function reset_map(map)
@@ -381,7 +351,11 @@ local function main()
     finish = { fx, fy, fz }
     -- map
     map = read_map()
-    map = prepare_map(dcopy(map), rcoords, start, finish)
+    map = prepare_map(us.dcopy(map), rcoords, start, finish)
+    -- !!
+    if not is_valid_coord(map, rcoords[1], rcoords[2], rcoords[3]) then
+        map = {}
+    end
 
     while true do
         rcoords = get_coord(correction_coords)
@@ -390,23 +364,26 @@ local function main()
             save_map(map)
             break
         end
-        map = c_map(dcopy(map), offset_table, rcoords, start, finish)
+        map = c_map(us.dcopy(map), offset_table, rcoords, start, finish)
         map[rx][ry][rz][1] = false
         next = search_next(map)
         rcoords = get_coord(correction_coords)
         path = search_path(map, next, rcoords, offset_table)
         for k, _ in pairs(path) do
             local moved = move_it(path[k], rcoords)
+            -- !!
             if not moved then
                 map = {}
                 rcoords = get_coord(correction_coords)
-                map = c_map(dcopy(map), offset_table, rcoords, rcoords, finish)
+                map = c_map(us.dcopy(map), offset_table, rcoords, rcoords, finish)
                 break
             end
             rcoords = get_coord(correction_coords)
-            map = c_map(dcopy(map), offset_table, rcoords, start, finish)
+            map = c_map(us.dcopy(map), offset_table, rcoords, start, finish)
         end
     end
 end
 
 main()
+
+
