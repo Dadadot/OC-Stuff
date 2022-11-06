@@ -22,6 +22,68 @@ local function is_valid_coord(map, x, y, z)
     return false
 end
 
+local function any(val, table)
+    for _, v in pairs(table) do
+        if val == v then
+            return true
+        end
+    end
+    return false
+end
+
+-- i don't know if this is even necessary
+local function btn(bool)
+    return bool and 1 or 0
+end
+
+local function ntb(num)
+    return num == 1 and true or false
+end
+
+local function stb(str)
+    return any(str, { "true", "1" }) and true or false
+end
+
+-- map[x][y][z] = {open, distance, hardness, traversable}
+local function save_map(map)
+    local file = assert(io.open("map.txt", "w"))
+    io.output(file)
+    for x, _ in pairs(map) do
+        for y, _ in pairs(map[x]) do
+            for z, m in pairs(map[x][y]) do
+                io.write(x, " ", y, " ", z, " ", m[3], " ", btn(m[4]), " \n")
+            end
+        end
+    end
+end
+
+local function read_map()
+    local arr_return = {}
+    local file = io.open("map.txt", "r")
+    if not file then return {} end
+    io.input(file)
+    while true do
+        local line = io.read('*line')
+        if not line then break end
+        local arr_tmp = {}
+        local start = 1
+        local stop = 1
+        local s_string
+        for _ = 1, 5 do
+            stop = string.find(line, " ", stop + 1)
+            s_string = string.sub(line, start, stop - 1)
+            table.insert(arr_tmp, s_string)
+            start = stop + 1
+        end
+        local x, y, z = tonumber(arr_tmp[1]), tonumber(arr_tmp[2]), tonumber(arr_tmp[3])
+        local h, t = tonumber(arr_tmp[4]), stb(arr_tmp[5])
+        arr_return[x] = arr_return[x] or {}
+        arr_return[x][y] = arr_return[x][y] or {}
+        arr_return[x][y][z] = arr_return[x][y][z] or { nil, nil, h, t }
+    end
+    return arr_return
+end
+
 -- match robots perceived coordinates with 'true' ingame coordinates
 local function coord_correction()
     io.write("Enter robot x, y and z coordinates (seperated by spaces): \n")
@@ -84,9 +146,9 @@ local function move_it(target, r_coord)
     local target_dir
     local r_dir = nav.getFacing()
     if r_coord[2] > target_y then
-        robot.down()
+        return robot.down()
     elseif r_coord[2] < target_y then
-        robot.up()
+        return robot.up()
     else
         if r_coord[1] > target_x then target_dir = 4.0
         elseif r_coord[1] < target_x then target_dir = 5.0
@@ -96,16 +158,16 @@ local function move_it(target, r_coord)
         if r_dir ~= target_dir then
             turn_it(r_dir, target_dir)
         end
-        robot.forward()
+        return robot.forward()
     end
 end
 
 local function distance(self_in, start, target)
-    local return_distance = math.abs(target[1] - self_in[1]) + math.abs(target[2] - self_in[2]) +
+    local sd = (math.abs(start[1] - self_in[1]) + math.abs(start[2] - self_in[2]) +
+        math.abs(start[3] - self_in[3]))
+    local td = math.abs(target[1] - self_in[1]) + math.abs(target[2] - self_in[2]) +
         math.abs(target[3] - self_in[3])
-    local s_dist = math.abs(start[1] - self_in[1]) + math.abs(start[2] - self_in[2]) +
-        math.abs(start[3] - self_in[3])
-    return return_distance / s_dist
+    return td + sd
 end
 
 local function reset_map(map)
@@ -114,6 +176,18 @@ local function reset_map(map)
             for z, _ in pairs(map[x][y]) do
                 map[x][y][z][1] = nil
                 map[x][y][z][2] = nil
+            end
+        end
+    end
+    return map
+end
+
+local function prepare_map(map, rcoords, start, finish)
+    for x, _ in pairs(map) do
+        for y, _ in pairs(map[x]) do
+            for z, _ in pairs(map[x][y]) do
+                map[x][y][z][1] = map[x][y][z][3] == 0 and true or false
+                map[x][y][z][2] = distance({ x, y, z }, start, finish)
             end
         end
     end
@@ -156,7 +230,6 @@ end
 -- create map of surrounding area and store it to pairs(map)
 -- map[x][y][z] = {open, distance, hardness, traversable}
 local function c_map(map, offset_table, rcoords, start, finish)
-    print("c_map")
     -- depth
     local dx, dz, dy = 3, 3, 3
     -- start
@@ -179,7 +252,6 @@ end
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount, traversable}
 local function search_next(map)
-    print("search_next")
     local distance_min = math.huge
     local candidates = {}
     for x, _ in pairs(map) do
@@ -201,7 +273,6 @@ end
 
 -- produces path
 local function search_path_helper(path_in, target, steps_in, offset_table)
-    print("search_path_helper")
     local return_path = {}
     table.insert(return_path, target)
     steps_in = steps_in - 1
@@ -228,7 +299,6 @@ end
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount}
 local function search_path(map, target, rcoords, offset_table)
-    print("search_path")
     local path_tmp = {}
     local final_step
     -- target coords
@@ -309,11 +379,15 @@ local function main()
     local fx, fy, fz = io.read("*n", "*n", "*n")
     fx, fy, fz = fx + 1000, fy + 1000, fz + 1000
     finish = { fx, fy, fz }
+    -- map
+    map = read_map()
+    map = prepare_map(dcopy(map), rcoords, start, finish)
 
     while true do
         rcoords = get_coord(correction_coords)
         local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
         if rx == fx and ry == fy and rz == fz then
+            save_map(map)
             break
         end
         map = c_map(dcopy(map), offset_table, rcoords, start, finish)
@@ -322,7 +396,13 @@ local function main()
         rcoords = get_coord(correction_coords)
         path = search_path(map, next, rcoords, offset_table)
         for k, _ in pairs(path) do
-            move_it(path[k], rcoords)
+            local moved = move_it(path[k], rcoords)
+            if not moved then
+                map = {}
+                rcoords = get_coord(correction_coords)
+                map = c_map(dcopy(map), offset_table, rcoords, rcoords, finish)
+                break
+            end
             rcoords = get_coord(correction_coords)
             map = c_map(dcopy(map), offset_table, rcoords, start, finish)
         end
