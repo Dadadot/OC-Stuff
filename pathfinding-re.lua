@@ -3,9 +3,6 @@ local component = require("component")
 local geo = component.geolyzer
 local nav = component.navigation
 local us = require("usual_suspects")
--- local btn = us.btn()
--- local stb = us.stb()
--- local dcopy = us.dcopy()
 
 local function is_valid_coord(map, x, y, z)
     if map[x] and map[x][y] and map[x][y][z] then
