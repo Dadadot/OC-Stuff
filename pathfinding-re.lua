@@ -1,10 +1,11 @@
-local robot = require("robot")
-local component = require("component")
-local geo = component.geolyzer
-local nav = component.navigation
-local us = require("usual_suspects")
+local pathfinding = {}
+pathfinding.robot = require("robot")
+pathfinding.component = require("component")
+pathfinding.geo = component.geolyzer
+pathfinding.nav = component.navigation
+pathfinding.us = require("usual_suspects")
 
-local function is_valid_coord(map, x, y, z)
+function pathfinding.is_valid_coord(map, x, y, z)
     if map[x] and map[x][y] and map[x][y][z] then
         return true
     end
@@ -12,19 +13,19 @@ local function is_valid_coord(map, x, y, z)
 end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
-local function save_map(map)
+function pathfinding.save_map(map)
     local file = assert(io.open("map.txt", "w"))
     io.output(file)
     for x, _ in pairs(map) do
         for y, _ in pairs(map[x]) do
             for z, m in pairs(map[x][y]) do
-                io.write(x, " ", y, " ", z, " ", m[3], " ", us.btn(m[4]), " \n")
+                io.write(x, " ", y, " ", z, " ", m[3], " ", pathfinding.us.btn(m[4]), " \n")
             end
         end
     end
 end
 
-local function read_map()
+function pathfinding.read_map()
     local arr_return = {}
     local file = io.open("map.txt", "r")
     if not file then return {} end
@@ -52,7 +53,7 @@ local function read_map()
 end
 
 -- match robots perceived coordinates with 'true' ingame coordinates
-local function coord_correction()
+function pathfinding.coord_correction()
     io.write("Enter robot x, y and z coordinates (seperated by spaces): \n")
     local io_x, io_y, io_z = io.read("*n", "*n", "*n")
     local nav_x, nav_y, nav_z = nav.getPosition()
@@ -63,7 +64,7 @@ local function coord_correction()
 end
 
 -- all coordinates +1000 because fuck negatives coordinates
-local function get_coord(correction_coords)
+function pathfinding.get_coord(correction_coords)
     local nav_x, nav_y, nav_z = nav.getPosition()
     local x = nav_x - correction_coords[1] + 1000
     local y = nav_y - correction_coords[2] + 1000
@@ -72,7 +73,7 @@ local function get_coord(correction_coords)
 end
 
 -- robot moving stuff
-local function turn_it(robotDir, targetDir)
+function pathfinding.turn_it(robotDir, targetDir)
     if robotDir == 5.0 then
         if targetDir == 4.0 then
             robot.turnAround()
@@ -108,7 +109,7 @@ local function turn_it(robotDir, targetDir)
     end
 end
 
-local function move_it(target, r_coord)
+function pathfinding.move_it(target, r_coord)
     local target_x, target_y, target_z = target[1], target[2], target[3]
     local target_dir
     local r_dir = nav.getFacing()
@@ -123,13 +124,13 @@ local function move_it(target, r_coord)
         elseif r_coord[3] < target_z then target_dir = 3.0
         end
         if r_dir ~= target_dir then
-            turn_it(r_dir, target_dir)
+            pathfinding.turn_it(r_dir, target_dir)
         end
         return robot.forward()
     end
 end
 
-local function distance(self_in, start, target)
+function pathfinding.distance(self_in, start, target)
     -- local sd = (math.abs(start[1] - self_in[1]) + math.abs(start[2] - self_in[2]) +
     --     math.abs(start[3] - self_in[3]))
     local td = math.abs(target[1] - self_in[1]) + math.abs(target[2] - self_in[2]) +
@@ -137,7 +138,7 @@ local function distance(self_in, start, target)
     return td
 end
 
-local function reset_map(map)
+function pathfinding.reset_map(map)
     for x, _ in pairs(map) do
         for y, _ in pairs(map[x]) do
             for z, _ in pairs(map[x][y]) do
@@ -149,12 +150,12 @@ local function reset_map(map)
     return map
 end
 
-local function prepare_map(map, rcoords, start, finish)
+function pathfinding.prepare_map(map, rcoords, start, finish)
     for x, _ in pairs(map) do
         for y, _ in pairs(map[x]) do
             for z, _ in pairs(map[x][y]) do
                 map[x][y][z][1] = map[x][y][z][3] == 0 and true or false
-                map[x][y][z][2] = distance({ x, y, z }, start, finish)
+                map[x][y][z][2] = pathfinding.distance({ x, y, z }, start, finish)
             end
         end
     end
@@ -163,7 +164,7 @@ end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- impure
-local function c_map_writer(map, scan, scan_off, rcoords, start, finish)
+function pathfinding.c_map_writer(map, scan, scan_off, rcoords, start, finish)
     local x_off, y_off, z_off = scan_off[1], scan_off[2], scan_off[3]
     local x = rcoords[1] + x_off
     local y = rcoords[2] + y_off
@@ -190,13 +191,13 @@ local function c_map_writer(map, scan, scan_off, rcoords, start, finish)
     end
     -- distance [2]
     if not node[2] then
-        node[2] = distance({ x, y, z }, start, finish)
+        node[2] = pathfinding.distance({ x, y, z }, start, finish)
     end
 end
 
 -- create map of surrounding area and store it to pairs(map)
 -- map[x][y][z] = {open, distance, hardness, traversable}
-local function c_map(map, offset_table, rcoords, start, finish)
+function pathfinding.c_map(map, offset_table, rcoords, start, finish)
     -- depth
     local dx, dz, dy = 3, 3, 3
     -- start
@@ -210,15 +211,15 @@ local function c_map(map, offset_table, rcoords, start, finish)
     scan_out[5] = tmp_scan[17]
     scan_out[6] = tmp_scan[23]
     for i = 1, 6 do
-        c_map_writer(map, scan_out[i], offset_table[i], rcoords, start, finish)
+        pathfinding.c_map_writer(map, scan_out[i], offset_table[i], rcoords, start, finish)
     end
-    c_map_writer(map, 0, { 0, 0, 0 }, rcoords, start, finish)
+    pathfinding.c_map_writer(map, 0, { 0, 0, 0 }, rcoords, start, finish)
     return map
 end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount, traversable}
-local function search_next(map)
+function pathfinding.search_next(map)
     local distance_min = math.huge
     local candidates = {}
     for x, _ in pairs(map) do
@@ -239,7 +240,7 @@ local function search_next(map)
 end
 
 -- produces path
-local function search_path_helper(path_in, target, steps_in, offset_table)
+function pathfinding.search_path_helper(path_in, target, steps_in, offset_table)
     local return_path = {}
     table.insert(return_path, target)
     steps_in = steps_in - 1
@@ -251,7 +252,7 @@ local function search_path_helper(path_in, target, steps_in, offset_table)
             local x = target[1] + offset_table[i][1]
             local y = target[2] + offset_table[i][2]
             local z = target[3] + offset_table[i][3]
-            if is_valid_coord(path_in, x, y, z) then
+            if pathfinding.is_valid_coord(path_in, x, y, z) then
                 if path_in[x][y][z][3] == steps_in then
                     table.insert(return_path, 1, { x, y, z })
                     target = { x, y, z }
@@ -265,7 +266,7 @@ end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount}
-local function search_path(map, target, rcoords, offset_table)
+function pathfinding.search_path(map, target, rcoords, offset_table)
     local path_tmp = {}
     local final_step
     -- target coords
@@ -291,7 +292,7 @@ local function search_path(map, target, rcoords, offset_table)
             local x = vx + v[1]
             local y = vy + v[2]
             local z = vz + v[3]
-            if is_valid_coord(map, x, y, z) then
+            if pathfinding.is_valid_coord(map, x, y, z) then
                 local map_trav = map[x][y][z][4]
                 if map_trav then
                     path_tmp[x] = path_tmp[x] or {}
@@ -304,7 +305,7 @@ local function search_path(map, target, rcoords, offset_table)
                     end
                     -- distance
                     if not node_tmp[2] then
-                        node_tmp[2] = distance({ x, y, z }, rcoords, target)
+                        node_tmp[2] = pathfinding.distance({ x, y, z }, rcoords, target)
                     end
                     -- stepcount
                     if not node_tmp[3]
@@ -314,15 +315,15 @@ local function search_path(map, target, rcoords, offset_table)
                 end
             end
         end
-        local next_step = search_next(path_tmp)
+        local next_step = pathfinding.search_next(path_tmp)
         vx, vy, vz = next_step[1], next_step[2], next_step[3]
     end
     final_step = path_tmp[tx][ty][tz][3]
-    local path_return = search_path_helper(path_tmp, target, final_step, offset_table)
+    local path_return = pathfinding.search_path_helper(path_tmp, target, final_step, offset_table)
     return path_return
 end
 
-local function main()
+function pathfinding.main()
     local offset_table = {
         [1] = { 0, -1, 0 },
         [2] = { 0, 0, -1 },
@@ -338,8 +339,8 @@ local function main()
     local map = {}
     local path = {}
     -- rcoord, start
-    correction_coords = coord_correction()
-    rcoords = get_coord(correction_coords)
+    correction_coords = pathfinding.coord_correction()
+    rcoords = pathfinding.get_coord(correction_coords)
     start = rcoords
     -- finish
     io.write("Target: \n")
@@ -347,40 +348,38 @@ local function main()
     fx, fy, fz = fx + 1000, fy + 1000, fz + 1000
     finish = { fx, fy, fz }
     -- map
-    map = read_map()
-    map = prepare_map(us.dcopy(map), rcoords, start, finish)
+    map = pathfinding.pathfinding.read_map()
+    map = pathfinding.prepare_map(pathfinding.us.dcopy(map), rcoords, start, finish)
     -- !!
-    if not is_valid_coord(map, rcoords[1], rcoords[2], rcoords[3]) then
+    if not pathfinding.is_valid_coord(map, rcoords[1], rcoords[2], rcoords[3]) then
         map = {}
     end
 
     while true do
-        rcoords = get_coord(correction_coords)
+        rcoords = pathfinding.get_coord(correction_coords)
         local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
         if rx == fx and ry == fy and rz == fz then
-            save_map(map)
+            pathfinding.save_map(map)
             break
         end
-        map = c_map(us.dcopy(map), offset_table, rcoords, start, finish)
+        map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
         map[rx][ry][rz][1] = false
-        next = search_next(map)
-        rcoords = get_coord(correction_coords)
-        path = search_path(map, next, rcoords, offset_table)
+        next = pathfinding.search_next(map)
+        rcoords = pathfinding.get_coord(correction_coords)
+        path = pathfinding.search_path(map, next, rcoords, offset_table)
         for k, _ in pairs(path) do
-            local moved = move_it(path[k], rcoords)
+            local moved = pathfinding.move_it(path[k], rcoords)
             -- !!
             if not moved then
                 map = {}
-                rcoords = get_coord(correction_coords)
-                map = c_map(us.dcopy(map), offset_table, rcoords, rcoords, finish)
+                rcoords = pathfinding.get_coord(correction_coords)
+                map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, rcoords, finish)
                 break
             end
-            rcoords = get_coord(correction_coords)
-            map = c_map(us.dcopy(map), offset_table, rcoords, start, finish)
+            rcoords = pathfinding.get_coord(correction_coords)
+            map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
         end
     end
 end
 
-main()
-
-
+pathfinding.main()
