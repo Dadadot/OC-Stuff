@@ -109,24 +109,30 @@ function pathfinding.turn_it(robotDir, targetDir)
     end
 end
 
-function pathfinding.move_it(target, r_coord)
+function pathfinding.move_it(target, r_coord, repeats)
     local target_x, target_y, target_z = target[1], target[2], target[3]
     local target_dir
     local r_dir = nav.getFacing()
-    if r_coord[2] > target_y then
-        return robot.down()
-    elseif r_coord[2] < target_y then
-        return robot.up()
-    else
-        if r_coord[1] > target_x then target_dir = 4.0
-        elseif r_coord[1] < target_x then target_dir = 5.0
-        elseif r_coord[3] > target_z then target_dir = 2.0
-        elseif r_coord[3] < target_z then target_dir = 3.0
+    local moved = false
+    local tries = 0
+    while tries < repeats do
+        if r_coord[2] > target_y then
+            moved = robot.down()
+        elseif r_coord[2] < target_y then
+            moved = robot.up()
+        else
+            if r_coord[1] > target_x then target_dir = 4.0
+            elseif r_coord[1] < target_x then target_dir = 5.0
+            elseif r_coord[3] > target_z then target_dir = 2.0
+            elseif r_coord[3] < target_z then target_dir = 3.0
+            end
+            if r_dir ~= target_dir then
+                pathfinding.turn_it(r_dir, target_dir)
+            end
+            moved = robot.forward()
         end
-        if r_dir ~= target_dir then
-            pathfinding.turn_it(r_dir, target_dir)
-        end
-        return robot.forward()
+        if moved then return true end
+        tries = tries + 1
     end
 end
 
@@ -163,7 +169,6 @@ function pathfinding.prepare_map(map, rcoords, start, finish)
 end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
--- impure
 function pathfinding.c_map_writer(map, scan, scan_off, rcoords, start, finish)
     local x_off, y_off, z_off = scan_off[1], scan_off[2], scan_off[3]
     local x = rcoords[1] + x_off
@@ -323,7 +328,43 @@ function pathfinding.search_path(map, target, rcoords, offset_table)
     return path_return
 end
 
-function pathfinding.main()
+function pathfinding.get_target_input()
+    io.write("Target: \n")
+    local fx, fy, fz = io.read("*n", "*n", "*n")
+    fx, fy, fz = fx + 1000, fy + 1000, fz + 1000
+    return { fx, fy, fz }
+end
+
+function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
+    local fx, fy, fz = finish[1], finish[2], finish[3]
+    while true do
+        rcoords = pathfinding.get_coord(correction_coords)
+        local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
+        if rx == fx and ry == fy and rz == fz then
+            pathfinding.save_map(map)
+            break
+        end
+        map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
+        map[rx][ry][rz][1] = false
+        next = pathfinding.search_next(map)
+        rcoords = pathfinding.get_coord(correction_coords)
+        local path = pathfinding.search_path(map, next, rcoords, offset_table)
+        for k, _ in pairs(path) do
+            local moved = pathfinding.move_it(path[k], rcoords, 5)
+            -- !! if robot hasn't moved wipe map (something changed)
+            if not moved then
+                map = {}
+                rcoords = pathfinding.get_coord(correction_coords)
+                map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, rcoords, finish)
+                break
+            end
+            rcoords = pathfinding.get_coord(correction_coords)
+            map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
+        end
+    end
+end
+
+function pathfinding.pathfinding()
     local offset_table = {
         [1] = { 0, -1, 0 },
         [2] = { 0, 0, -1 },
@@ -343,43 +384,15 @@ function pathfinding.main()
     rcoords = pathfinding.get_coord(correction_coords)
     start = rcoords
     -- finish
-    io.write("Target: \n")
-    local fx, fy, fz = io.read("*n", "*n", "*n")
-    fx, fy, fz = fx + 1000, fy + 1000, fz + 1000
-    finish = { fx, fy, fz }
+    finish = pathfinding.get_target_input()
     -- map
-    map = pathfinding.pathfinding.read_map()
+    map = pathfinding.read_map()
     map = pathfinding.prepare_map(pathfinding.us.dcopy(map), rcoords, start, finish)
-    -- !!
+    -- !! if robot position is not in saved map wipe map
     if not pathfinding.is_valid_coord(map, rcoords[1], rcoords[2], rcoords[3]) then
         map = {}
     end
-
-    while true do
-        rcoords = pathfinding.get_coord(correction_coords)
-        local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
-        if rx == fx and ry == fy and rz == fz then
-            pathfinding.save_map(map)
-            break
-        end
-        map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
-        map[rx][ry][rz][1] = false
-        next = pathfinding.search_next(map)
-        rcoords = pathfinding.get_coord(correction_coords)
-        path = pathfinding.search_path(map, next, rcoords, offset_table)
-        for k, _ in pairs(path) do
-            local moved = pathfinding.move_it(path[k], rcoords)
-            -- !!
-            if not moved then
-                map = {}
-                rcoords = pathfinding.get_coord(correction_coords)
-                map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, rcoords, finish)
-                break
-            end
-            rcoords = pathfinding.get_coord(correction_coords)
-            map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
-        end
-    end
+    pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
 end
 
-pathfinding.main()
+return pathfinding
