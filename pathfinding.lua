@@ -32,7 +32,7 @@ function pathfinding.read_map()
     io.input(file)
     while true do
         local line = io.read('*line')
-        if not line or #line < 1 then break end
+        if not line or #line < 5 then break end
         local arr_tmp = {}
         local start = 1
         local stop = 1
@@ -44,7 +44,7 @@ function pathfinding.read_map()
             start = stop + 1
         end
         local x, y, z = tonumber(arr_tmp[1]), tonumber(arr_tmp[2]), tonumber(arr_tmp[3])
-        local h, t = tonumber(arr_tmp[4]), pathfinding.us.ntb(arr_tmp[5])
+        local h, t = tonumber(arr_tmp[4]), pathfinding.us.stb(arr_tmp[5])
         arr_return[x] = arr_return[x] or {}
         arr_return[x][y] = arr_return[x][y] or {}
         arr_return[x][y][z] = arr_return[x][y][z] or { nil, nil, h, t }
@@ -378,7 +378,6 @@ function pathfinding.pathfinding()
     local correction_coords = {}
     local rcoords = {}
     local map = {}
-    local path = {}
     -- rcoord, start
     correction_coords = pathfinding.coord_correction()
     rcoords = pathfinding.get_coord(correction_coords)
