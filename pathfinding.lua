@@ -1,8 +1,8 @@
 local pathfinding = {}
 pathfinding.robot = require("robot")
 pathfinding.component = require("component")
-pathfinding.geo = component.geolyzer
-pathfinding.nav = component.navigation
+pathfinding.geo = pathfinding.component.geolyzer
+pathfinding.nav = pathfinding.component.navigation
 pathfinding.us = require("usual_suspects")
 
 function pathfinding.is_valid_coord(map, x, y, z)
@@ -32,7 +32,7 @@ function pathfinding.read_map()
     io.input(file)
     while true do
         local line = io.read('*line')
-        if not line then break end
+        if not line or #line < 1 then break end
         local arr_tmp = {}
         local start = 1
         local stop = 1
@@ -44,7 +44,7 @@ function pathfinding.read_map()
             start = stop + 1
         end
         local x, y, z = tonumber(arr_tmp[1]), tonumber(arr_tmp[2]), tonumber(arr_tmp[3])
-        local h, t = tonumber(arr_tmp[4]), us.stb(arr_tmp[5])
+        local h, t = tonumber(arr_tmp[4]), pathfinding.us.ntb(arr_tmp[5])
         arr_return[x] = arr_return[x] or {}
         arr_return[x][y] = arr_return[x][y] or {}
         arr_return[x][y][z] = arr_return[x][y][z] or { nil, nil, h, t }
@@ -56,7 +56,7 @@ end
 function pathfinding.coord_correction()
     io.write("Enter robot x, y and z coordinates (seperated by spaces): \n")
     local io_x, io_y, io_z = io.read("*n", "*n", "*n")
-    local nav_x, nav_y, nav_z = nav.getPosition()
+    local nav_x, nav_y, nav_z = pathfinding.nav.getPosition()
     local offset_x = nav_x - io_x
     local offset_y = nav_y - io_y
     local offset_z = nav_z - io_z
@@ -65,7 +65,7 @@ end
 
 -- all coordinates +1000 because fuck negatives coordinates
 function pathfinding.get_coord(correction_coords)
-    local nav_x, nav_y, nav_z = nav.getPosition()
+    local nav_x, nav_y, nav_z = pathfinding.nav.getPosition()
     local x = nav_x - correction_coords[1] + 1000
     local y = nav_y - correction_coords[2] + 1000
     local z = nav_z - correction_coords[3] + 1000
@@ -76,35 +76,35 @@ end
 function pathfinding.turn_it(robotDir, targetDir)
     if robotDir == 5.0 then
         if targetDir == 4.0 then
-            robot.turnAround()
+            pathfinding.robot.turnAround()
         elseif targetDir == 3.0 then
-            robot.turnRight()
+            pathfinding.robot.turnRight()
         else
-            robot.turnLeft()
+            pathfinding.robot.turnLeft()
         end
     elseif robotDir == 4.0 then
         if targetDir == 5.0 then
-            robot.turnAround()
+            pathfinding.robot.turnAround()
         elseif targetDir == 3.0 then
-            robot.turnLeft()
+            pathfinding.robot.turnLeft()
         else
-            robot.turnRight()
+            pathfinding.robot.turnRight()
         end
     elseif robotDir == 3.0 then
         if targetDir == 5.0 then
-            robot.turnLeft()
+            pathfinding.robot.turnLeft()
         elseif targetDir == 4.0 then
-            robot.turnRight()
+            pathfinding.robot.turnRight()
         else
-            robot.turnAround()
+            pathfinding.robot.turnAround()
         end
     else
         if targetDir == 5.0 then
-            robot.turnRight()
+            pathfinding.robot.turnRight()
         elseif targetDir == 4.0 then
-            robot.turnLeft()
+            pathfinding.robot.turnLeft()
         else
-            robot.turnAround()
+            pathfinding.robot.turnAround()
         end
     end
 end
@@ -112,14 +112,14 @@ end
 function pathfinding.move_it(target, r_coord, repeats)
     local target_x, target_y, target_z = target[1], target[2], target[3]
     local target_dir
-    local r_dir = nav.getFacing()
+    local r_dir = pathfinding.nav.getFacing()
     local moved = false
     local tries = 0
     while tries < repeats do
         if r_coord[2] > target_y then
-            moved = robot.down()
+            moved = pathfinding.robot.down()
         elseif r_coord[2] < target_y then
-            moved = robot.up()
+            moved = pathfinding.robot.up()
         else
             if r_coord[1] > target_x then target_dir = 4.0
             elseif r_coord[1] < target_x then target_dir = 5.0
@@ -129,7 +129,7 @@ function pathfinding.move_it(target, r_coord, repeats)
             if r_dir ~= target_dir then
                 pathfinding.turn_it(r_dir, target_dir)
             end
-            moved = robot.forward()
+            moved = pathfinding.robot.forward()
         end
         if moved then return true end
         tries = tries + 1
@@ -207,7 +207,7 @@ function pathfinding.c_map(map, offset_table, rcoords, start, finish)
     local dx, dz, dy = 3, 3, 3
     -- start
     local sx, sz, sy = -1, -1, -1
-    local tmp_scan = geo.scan(sx, sz, sy, dx, dz, dy)
+    local tmp_scan = pathfinding.geo.scan(sx, sz, sy, dx, dz, dy)
     local scan_out = {}
     scan_out[1] = tmp_scan[5]
     scan_out[2] = tmp_scan[11]
