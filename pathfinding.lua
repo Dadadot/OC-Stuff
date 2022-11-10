@@ -5,12 +5,7 @@ pathfinding.geo = pathfinding.component.geolyzer
 pathfinding.nav = pathfinding.component.navigation
 pathfinding.us = require("usual_suspects")
 
-function pathfinding.is_valid_coord(map, x, y, z)
-    if map[x] and map[x][y] and map[x][y][z] then
-        return true
-    end
-    return false
-end
+-- IO-Stuff
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 function pathfinding.save_map(map)
@@ -52,6 +47,13 @@ function pathfinding.read_map()
     return arr_return
 end
 
+function pathfinding.get_target_input()
+    io.write("Target: \n")
+    local fx, fy, fz = io.read("*n", "*n", "*n")
+    fx, fy, fz = fx + 1000, fy + 1000, fz + 1000
+    return { fx, fy, fz }
+end
+
 -- match robots perceived coordinates with 'true' ingame coordinates
 function pathfinding.coord_correction()
     io.write("Enter robot x, y and z coordinates (seperated by spaces): \n")
@@ -72,7 +74,18 @@ function pathfinding.get_coord(correction_coords)
     return { x, y, z }
 end
 
--- robot moving stuff
+function pathfinding.is_valid_coord(map, x, y, z)
+    if map[x] and map[x][y] and map[x][y][z] then
+        return true
+    end
+    return false
+end
+
+-- /IO-Stuff
+
+
+-- Robot Moving Stuff
+
 function pathfinding.turn_it(robotDir, targetDir)
     if robotDir == 5.0 then
         if targetDir == 4.0 then
@@ -136,6 +149,11 @@ function pathfinding.move_it(target, r_coord, repeats)
     end
 end
 
+-- /Robot Moving Stuff
+
+
+-- Different Helper Functions
+
 function pathfinding.distance(self_in, start, target)
     -- local sd = (math.abs(start[1] - self_in[1]) + math.abs(start[2] - self_in[2]) +
     --     math.abs(start[3] - self_in[3]))
@@ -167,6 +185,54 @@ function pathfinding.prepare_map(map, rcoords, start, finish)
     end
     return map
 end
+
+function pathfinding.find_near(target, offset_table)
+    local arr_return = {}
+    for _, v in pairs(offset_table) do
+        local x = target[1] + v[1]
+        local y = target[2] + v[2]
+        local z = target[3] + v[3]
+        table.insert(arr_return, { x, y, z })
+    end
+    return arr_return
+end
+
+
+function pathfinding.find_waypoint(wp_name, rcoords)
+    local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
+    local wpx, wpy, wpz
+    local wps = pathfinding.nav.findWaypoints()
+    local arr_tmp
+    for _, v in pairs(wps) do
+        if string.find(v[3], wp_name) then
+            wpx, wpy, wpz = v[1][1], v[1][2] - 1, v[1][3]
+            wpx = wpx + rx
+            wpy = wpy + ry
+            wpz = wpz + rz
+            table.insert(arr_tmp, {wpx, wpy, wpz})
+        end
+    end
+    if #arr_tmp > 1 then
+        local dist_min, i_min = math.huge, nil
+        for i = 1, #arr_tmp do
+            local dist_tmp = pathfinding.distance(rcoords, rcoords, arr_tmp[i])
+            if dist_min > dist_tmp then
+                dist_min = dist_tmp
+                i_min = i
+            end
+        end
+        return arr_tmp[i_min]
+    elseif #arr_tmp == 1 then
+        return arr_tmp[1]
+    else
+        return false
+    end
+end
+
+-- /Different Helper Functions
+
+
+-- Meat And Potatoes
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
 function pathfinding.c_map_writer(map, scan, scan_off, rcoords, start, finish)
@@ -220,17 +286,6 @@ function pathfinding.c_map(map, offset_table, rcoords, start, finish)
     end
     pathfinding.c_map_writer(map, 0, { 0, 0, 0 }, rcoords, start, finish)
     return map
-end
-
-function pathfinding.find_near(target, offset_table)
-    local arr_return = {}
-    for _, v in pairs(offset_table) do
-        local x = target[1] + v[1]
-        local y = target[2] + v[2]
-        local z = target[3] + v[3]
-        arr_return.insert({ x, y, z })
-    end
-    return arr_return
 end
 
 -- map[x][y][z] = {open, distance, hardness, traversable}
@@ -339,13 +394,6 @@ function pathfinding.search_path(map, target, rcoords, offset_table)
     return path_return
 end
 
-function pathfinding.get_target_input()
-    io.write("Target: \n")
-    local fx, fy, fz = io.read("*n", "*n", "*n")
-    fx, fy, fz = fx + 1000, fy + 1000, fz + 1000
-    return { fx, fy, fz }
-end
-
 -- 0 moved to target, 1 moved next to target, 3 something went wrong
 function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
     local fx, fy, fz = finish[1], finish[2], finish[3]
@@ -365,7 +413,7 @@ function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table,
             local moved = pathfinding.move_it(v, rcoords, 5)
             -- !! if robot hasn't moved wipe map (something changed)
             if not moved then
-                -- if next to last move
+                -- if next to last move then don't wipe map
                 local x, y, z = v[1], v[2], v[3]
                 local stepcount = map[x][y][z][2]
                 if stepcount == 1 then
@@ -406,5 +454,7 @@ function pathfinding.pathfinding(target, correction_coords)
     end
     pathfinding.pathfinding_loop(map, rcoords, start, target, offset_table, correction_coords)
 end
+
+-- /Meat And Potatoes
 
 return pathfinding
