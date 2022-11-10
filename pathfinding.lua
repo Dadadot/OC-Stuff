@@ -222,6 +222,17 @@ function pathfinding.c_map(map, offset_table, rcoords, start, finish)
     return map
 end
 
+function pathfinding.find_near(target, offset_table)
+    local arr_return = {}
+    for _, v in pairs(offset_table) do
+        local x = target[1] + v[1]
+        local y = target[2] + v[2]
+        local z = target[3] + v[3]
+        arr_return.insert({x, y, z})
+    end
+    return arr_return
+end
+
 -- map[x][y][z] = {open, distance, hardness, traversable}
 -- path[x][y][z] = {open, distance, stepcount, traversable}
 function pathfinding.search_next(map)
@@ -364,7 +375,7 @@ function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table,
     end
 end
 
-function pathfinding.pathfinding()
+function pathfinding.pathfinding(target, correction_coords)
     local offset_table = {
         [1] = { 0, -1, 0 },
         [2] = { 0, 0, -1 },
@@ -374,24 +385,19 @@ function pathfinding.pathfinding()
         [6] = { 0, 1, 0 }
     }
     local start = {}
-    local finish = {}
-    local correction_coords = {}
     local rcoords = {}
     local map = {}
     -- rcoord, start
-    correction_coords = pathfinding.coord_correction()
     rcoords = pathfinding.get_coord(correction_coords)
     start = rcoords
-    -- finish
-    finish = pathfinding.get_target_input()
     -- map
     map = pathfinding.read_map()
-    map = pathfinding.prepare_map(pathfinding.us.dcopy(map), rcoords, start, finish)
+    map = pathfinding.prepare_map(pathfinding.us.dcopy(map), rcoords, start, target)
     -- !! if robot position is not in saved map wipe map
     if not pathfinding.is_valid_coord(map, rcoords[1], rcoords[2], rcoords[3]) then
         map = {}
     end
-    pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
+    pathfinding.pathfinding_loop(map, rcoords, start, target, offset_table, correction_coords)
 end
 
 return pathfinding
