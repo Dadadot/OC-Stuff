@@ -8,5 +8,4 @@ local target = pf.get_target_input()
 pf.pathfinding(target, correction_coords)
 end
 
-
 main_loop()

@@ -228,7 +228,7 @@ function pathfinding.find_near(target, offset_table)
         local x = target[1] + v[1]
         local y = target[2] + v[2]
         local z = target[3] + v[3]
-        arr_return.insert({x, y, z})
+        arr_return.insert({ x, y, z })
     end
     return arr_return
 end
@@ -346,6 +346,7 @@ function pathfinding.get_target_input()
     return { fx, fy, fz }
 end
 
+-- 0 moved to target, 1 moved next to target, 3 something went wrong
 function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
     local fx, fy, fz = finish[1], finish[2], finish[3]
     while true do
@@ -353,21 +354,27 @@ function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table,
         local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
         if rx == fx and ry == fy and rz == fz then
             pathfinding.save_map(map)
-            break
+            return 0
         end
         map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
         map[rx][ry][rz][1] = false
         next = pathfinding.search_next(map)
         rcoords = pathfinding.get_coord(correction_coords)
         local path = pathfinding.search_path(map, next, rcoords, offset_table)
-        for k, _ in pairs(path) do
-            local moved = pathfinding.move_it(path[k], rcoords, 5)
+        for _, v in pairs(path) do
+            local moved = pathfinding.move_it(v, rcoords, 5)
             -- !! if robot hasn't moved wipe map (something changed)
             if not moved then
+                -- if next to last move
+                local x, y, z = v[1], v[2], v[3]
+                local stepcount = map[x][y][z][2]
+                if stepcount == 1 then
+                    return 1
+                end
                 map = {}
                 rcoords = pathfinding.get_coord(correction_coords)
                 map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, rcoords, finish)
-                break
+                return 3
             end
             rcoords = pathfinding.get_coord(correction_coords)
             map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
