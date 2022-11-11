@@ -87,66 +87,49 @@ end
 -- Robot Moving Stuff
 
 function pathfinding.turn_it(robotDir, targetDir)
-    if robotDir == 5.0 then
-        if targetDir == 4.0 then
-            pathfinding.robot.turnAround()
-        elseif targetDir == 3.0 then
-            pathfinding.robot.turnRight()
-        else
-            pathfinding.robot.turnLeft()
-        end
-    elseif robotDir == 4.0 then
-        if targetDir == 5.0 then
-            pathfinding.robot.turnAround()
-        elseif targetDir == 3.0 then
-            pathfinding.robot.turnLeft()
-        else
-            pathfinding.robot.turnRight()
-        end
-    elseif robotDir == 3.0 then
-        if targetDir == 5.0 then
-            pathfinding.robot.turnLeft()
-        elseif targetDir == 4.0 then
-            pathfinding.robot.turnRight()
-        else
-            pathfinding.robot.turnAround()
-        end
-    else
-        if targetDir == 5.0 then
-            pathfinding.robot.turnRight()
-        elseif targetDir == 4.0 then
-            pathfinding.robot.turnLeft()
-        else
-            pathfinding.robot.turnAround()
+    -- turn -> {around, right, left}
+    local dir = {
+        [2] = { 3, 5, 4 },
+        [3] = { 2, 4, 5 },
+        [4] = { 5, 2, 3 },
+        [5] = { 4, 3, 2 }
+    }
+    local dir_tmp = dir[robotDir]
+    for k, v in pairs(dir_tmp) do
+        if v == targetDir then
+            if k == 1 then
+                pathfinding.robot.turnAround()
+            elseif k == 2 then
+                pathfinding.robot.turnRight()
+            else
+                pathfinding.robot.turnLeft()
+            end
         end
     end
 end
 
-function pathfinding.move_it(target, r_coord, repeats)
+function pathfinding.move_it(target, r_coord)
     local target_x, target_y, target_z = target[1], target[2], target[3]
     local target_dir
     local r_dir = pathfinding.nav.getFacing()
     local moved = false
-    local tries = 0
-    while tries < repeats do
-        if r_coord[2] > target_y then
-            moved = pathfinding.robot.down()
-        elseif r_coord[2] < target_y then
-            moved = pathfinding.robot.up()
-        else
-            if r_coord[1] > target_x then target_dir = 4.0
-            elseif r_coord[1] < target_x then target_dir = 5.0
-            elseif r_coord[3] > target_z then target_dir = 2.0
-            elseif r_coord[3] < target_z then target_dir = 3.0
-            end
-            if r_dir ~= target_dir then
-                pathfinding.turn_it(r_dir, target_dir)
-            end
-            moved = pathfinding.robot.forward()
+    if r_coord[2] > target_y then
+        moved = pathfinding.robot.down()
+    elseif r_coord[2] < target_y then
+        moved = pathfinding.robot.up()
+    else
+        if r_coord[1] > target_x then target_dir = 4.0
+        elseif r_coord[1] < target_x then target_dir = 5.0
+        elseif r_coord[3] > target_z then target_dir = 2.0
+        elseif r_coord[3] < target_z then target_dir = 3.0
         end
-        if moved then return true end
-        tries = tries + 1
+        if r_dir ~= target_dir then
+            pathfinding.turn_it(r_dir, target_dir)
+            r_dir = pathfinding.nav.getFacing()
+        end
+        moved = pathfinding.robot.forward()
     end
+    return moved and true or false
 end
 
 -- /Robot Moving Stuff
@@ -197,36 +180,35 @@ function pathfinding.find_near(target, offset_table)
     return arr_return
 end
 
-
+-- if wp_name has multiple results the closest is chosen
 function pathfinding.find_waypoint(wp_name, rcoords)
     local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
-    local wpx, wpy, wpz
-    local wps = pathfinding.nav.findWaypoints()
-    local arr_tmp
-    for _, v in pairs(wps) do
-        if string.find(v[3], wp_name) then
-            wpx, wpy, wpz = v[1][1], v[1][2] - 1, v[1][3]
-            wpx = wpx + rx
-            wpy = wpy + ry
-            wpz = wpz + rz
-            table.insert(arr_tmp, {wpx, wpy, wpz})
+    local waypoint_search
+    local range = 10
+    local dist_max = math.huge
+    local arr_return = nil
+    while true do
+        waypoint_search = pathfinding.nav.findWaypoints(range)
+        if #waypoint_search > 0 then
+            break
         end
+        range = range + 10
     end
-    if #arr_tmp > 1 then
-        local dist_min, i_min = math.huge, nil
-        for i = 1, #arr_tmp do
-            local dist_tmp = pathfinding.distance(rcoords, rcoords, arr_tmp[i])
-            if dist_min > dist_tmp then
-                dist_min = dist_tmp
-                i_min = i
+    for i = 1, #waypoint_search do
+        local v = waypoint_search[i]
+        if string.find(v.label, wp_name) then
+            local wpx, wpy, wpz = v.position[1], v.position[2] - 1, v.position[3]
+            local dist_tmp = pathfinding.distance(rcoords, rcoords, { wpx, wpy, wpz })
+            if dist_max > dist_tmp then
+                wpx = wpx + rx
+                wpy = wpy + ry
+                wpz = wpz + rz
+                arr_return = { wpx, wpy, wpz }
+                dist_max = dist_tmp
             end
         end
-        return arr_tmp[i_min]
-    elseif #arr_tmp == 1 then
-        return arr_tmp[1]
-    else
-        return false
     end
+    return arr_return or false
 end
 
 -- /Different Helper Functions
@@ -394,15 +376,13 @@ function pathfinding.search_path(map, target, rcoords, offset_table)
     return path_return
 end
 
--- 0 moved to target, 1 moved next to target, 3 something went wrong
 function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
     local fx, fy, fz = finish[1], finish[2], finish[3]
     while true do
         rcoords = pathfinding.get_coord(correction_coords)
         local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
         if rx == fx and ry == fy and rz == fz then
-            pathfinding.save_map(map)
-            return 0
+            break
         end
         map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
         map[rx][ry][rz][1] = false
@@ -410,24 +390,25 @@ function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table,
         rcoords = pathfinding.get_coord(correction_coords)
         local path = pathfinding.search_path(map, next, rcoords, offset_table)
         for _, v in pairs(path) do
-            local moved = pathfinding.move_it(v, rcoords, 5)
+            local moved = pathfinding.move_it(v, rcoords)
             -- !! if robot hasn't moved wipe map (something changed)
             if not moved then
                 -- if next to last move then don't wipe map
                 local x, y, z = v[1], v[2], v[3]
                 local stepcount = map[x][y][z][2]
-                if stepcount == 1 then
-                    return 1
+                if stepcount == 0 then
+                    break
                 end
                 map = {}
                 rcoords = pathfinding.get_coord(correction_coords)
                 map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, rcoords, finish)
-                return 3
+                break
             end
             rcoords = pathfinding.get_coord(correction_coords)
             map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
         end
     end
+    return map
 end
 
 function pathfinding.pathfinding(target, correction_coords)
@@ -452,7 +433,8 @@ function pathfinding.pathfinding(target, correction_coords)
     if not pathfinding.is_valid_coord(map, rcoords[1], rcoords[2], rcoords[3]) then
         map = {}
     end
-    pathfinding.pathfinding_loop(map, rcoords, start, target, offset_table, correction_coords)
+    map = pathfinding.pathfinding_loop(map, rcoords, start, target, offset_table, correction_coords)
+    pathfinding.save_map(map)
 end
 
 -- /Meat And Potatoes

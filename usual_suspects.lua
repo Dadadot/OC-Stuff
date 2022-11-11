@@ -32,8 +32,13 @@ function usual_suspects.ntb(num)
     return num == 1 and true or false
 end
 
+-- falsy = anything that == 0 and "false"(caseinsensitive), rest true
 function usual_suspects.stb(str)
-    return usual_suspects.any(str, { "true", "1" }) and true or false
+    assert(type(str) == "string", "stb expects a string.")
+    str = string.upper(str)
+    if tonumber(str) and tonumber(str) == 0 then return false end
+    if str == "FALSE" then return false end
+    return true
 end
 
 return usual_suspects
