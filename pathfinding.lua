@@ -378,6 +378,7 @@ end
 
 function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
     local fx, fy, fz = finish[1], finish[2], finish[3]
+    local repeats = 1
     while true do
         rcoords = pathfinding.get_coord(correction_coords)
         local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
