@@ -129,6 +129,9 @@ function pathfinding.move_it(target, r_coord, repeats)
     local moved = false
     local tries = 0
     while tries < repeats do
+        if tries > 0 then
+            os.sleep(5)
+        end
         if r_coord[2] > target_y then
             moved = pathfinding.robot.down()
         elseif r_coord[2] < target_y then
@@ -141,6 +144,7 @@ function pathfinding.move_it(target, r_coord, repeats)
             end
             if r_dir ~= target_dir then
                 pathfinding.turn_it(r_dir, target_dir)
+                r_dir = pathfinding.nav.getFacing()
             end
             moved = pathfinding.robot.forward()
         end
@@ -197,7 +201,6 @@ function pathfinding.find_near(target, offset_table)
     return arr_return
 end
 
-
 function pathfinding.find_waypoint(wp_name, rcoords)
     local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
     local wpx, wpy, wpz
@@ -209,7 +212,7 @@ function pathfinding.find_waypoint(wp_name, rcoords)
             wpx = wpx + rx
             wpy = wpy + ry
             wpz = wpz + rz
-            table.insert(arr_tmp, {wpx, wpy, wpz})
+            table.insert(arr_tmp, { wpx, wpy, wpz })
         end
     end
     if #arr_tmp > 1 then
@@ -397,12 +400,12 @@ end
 -- 0 moved to target, 1 moved next to target, 3 something went wrong
 function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table, correction_coords)
     local fx, fy, fz = finish[1], finish[2], finish[3]
+    local repeats = 1
     while true do
         rcoords = pathfinding.get_coord(correction_coords)
         local rx, ry, rz = rcoords[1], rcoords[2], rcoords[3]
         if rx == fx and ry == fy and rz == fz then
-            pathfinding.save_map(map)
-            return 0
+            break
         end
         map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
         map[rx][ry][rz][1] = false
@@ -410,24 +413,25 @@ function pathfinding.pathfinding_loop(map, rcoords, start, finish, offset_table,
         rcoords = pathfinding.get_coord(correction_coords)
         local path = pathfinding.search_path(map, next, rcoords, offset_table)
         for _, v in pairs(path) do
-            local moved = pathfinding.move_it(v, rcoords, 5)
+            local moved = pathfinding.move_it(v, rcoords, repeats)
             -- !! if robot hasn't moved wipe map (something changed)
             if not moved then
                 -- if next to last move then don't wipe map
                 local x, y, z = v[1], v[2], v[3]
                 local stepcount = map[x][y][z][2]
-                if stepcount == 1 then
-                    return 1
+                if stepcount == 0 then
+                    break
                 end
                 map = {}
                 rcoords = pathfinding.get_coord(correction_coords)
                 map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, rcoords, finish)
-                return 3
+                break
             end
             rcoords = pathfinding.get_coord(correction_coords)
             map = pathfinding.c_map(pathfinding.us.dcopy(map), offset_table, rcoords, start, finish)
         end
     end
+    return map
 end
 
 function pathfinding.pathfinding(target, correction_coords)
@@ -452,7 +456,8 @@ function pathfinding.pathfinding(target, correction_coords)
     if not pathfinding.is_valid_coord(map, rcoords[1], rcoords[2], rcoords[3]) then
         map = {}
     end
-    pathfinding.pathfinding_loop(map, rcoords, start, target, offset_table, correction_coords)
+    map = pathfinding.pathfinding_loop(map, rcoords, start, target, offset_table, correction_coords)
+    pathfinding.save_map(map)
 end
 
 -- /Meat And Potatoes
